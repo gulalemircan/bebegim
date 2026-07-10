@@ -27,6 +27,15 @@ export default function RenkHafiza({ playerName }: Props) {
   const sbRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
 
+  // Ref'ler ile stale closure sorununu çöz
+  const hueRef = useRef(0);
+  const satRef = useRef(0);
+  const briRef = useRef(50);
+
+  const setHueSafe = (v: number) => { hueRef.current = v; setHue(v); };
+  const setSatSafe = (v: number) => { satRef.current = v; setSat(v); };
+  const setBriSafe = (v: number) => { briRef.current = v; setBri(v); };
+
   useEffect(() => {
     const unsub = onValue(ref(db, 'game'), (snap: any) => {
       setGameData(snap?.val?.() ?? null);
@@ -44,7 +53,6 @@ export default function RenkHafiza({ playerName }: Props) {
     });
   };
 
-  // Handle game state transitions
   useEffect(() => {
     if (!gameData) return;
     clearInterval(phaseTimer.current);
@@ -53,28 +61,29 @@ export default function RenkHafiza({ playerName }: Props) {
       setLocalStatus('idle');
     } else if (gameData?.status === 'memorize' && localStatus !== 'memorize') {
       setLocalStatus('memorize');
-      // Start memorize countdown
       let t = 5;
       phaseTimer.current = setInterval(() => {
         t--;
         if (t <= 0) {
           clearInterval(phaseTimer.current);
+          // Sadece bir oyuncu yazar (Emircan), ama her ikisi de lokal geçişi yapar
           if (playerName === 'Emircan') set(ref(db, 'game/status'), 'recall');
         }
       }, 1000);
     } else if (gameData?.status === 'recall' && localStatus !== 'recall') {
       setLocalStatus('recall');
-      setHue(Math.floor(Math.random() * 360));
-      setSat(0);
-      setBri(50);
+      const startH = Math.floor(Math.random() * 360);
+      setHueSafe(startH);
+      setSatSafe(0);
+      setBriSafe(50);
       if (gameData?.mode === 'timer') {
         let t = 10;
         phaseTimer.current = setInterval(() => {
           t--;
           if (t <= 0) {
             clearInterval(phaseTimer.current);
-            // Auto submit
-            const c = hsbToRgb(hue, sat, bri);
+            // Ref'lerden güncel değerleri al (stale closure yok)
+            const c = hsbToRgb(hueRef.current, satRef.current, briRef.current);
             set(ref(db, `game/guesses/${playerName}`), c);
           }
         }, 1000);
@@ -84,10 +93,8 @@ export default function RenkHafiza({ playerName }: Props) {
       sfx.success();
     }
 
-    // Check if both guesses are in
     if (gameData?.status === 'recall' && gameData?.guesses?.Emircan && gameData?.guesses?.Efsun) {
       if (playerName === 'Emircan') {
-        // Calculate result
         const t = gameData?.target ?? { r: 0, g: 0, b: 0 };
         const eg = gameData?.guesses?.Emircan ?? { r: 0, g: 0, b: 0 };
         const fg = gameData?.guesses?.Efsun ?? { r: 0, g: 0, b: 0 };
@@ -122,8 +129,8 @@ export default function RenkHafiza({ playerName }: Props) {
     let y = (clientY - rect.top) / rect.height;
     x = Math.min(1, Math.max(0, x));
     y = Math.min(1, Math.max(0, y));
-    setSat(Math.round(x * 100));
-    setBri(Math.round((1 - y) * 100));
+    setSatSafe(Math.round(x * 100));
+    setBriSafe(Math.round((1 - y) * 100));
   }, []);
 
   const isLocked = localStatus !== 'recall' || (gameData?.guesses?.[playerName] && gameData?.guesses?.[playerName] !== false);
@@ -158,16 +165,13 @@ export default function RenkHafiza({ playerName }: Props) {
         <div style={{ fontWeight: 700, fontSize: '0.74rem', color: 'var(--tozpembe)', marginBottom: 16 }}>
           {localStatus === 'memorize' ? 'Renge iyi bak!' : localStatus === 'recall' ? (gameData?.mode === 'timer' ? 'Aynı rengi bul (10 Saniye!)' : 'Aynı rengi bul (Süre yok)') : 'Sonuçlar'}
         </div>
-
         <div style={{ borderRadius: 22, padding: 5, background: 'linear-gradient(135deg, var(--bordo), var(--yesil), var(--mavi))' }}>
-          <div style={{ width: '100%', height: 170, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Fraunces', serif", fontSize: '2.4rem', color: 'rgba(255,255,255,0.4)', background: showColor, transition: 'background-color .12s linear' }}>
-            {localStatus === 'memorize' && ''}
-          </div>
+          <div style={{ width: '100%', height: 170, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Fraunces', serif", fontSize: '2.4rem', color: 'rgba(255,255,255,0.4)', background: showColor, transition: 'background-color .12s linear' }} />
         </div>
-
         {localStatus === 'recall' && !isLocked && (
-          <div style={{ marginTop: 16, opacity: isLocked ? 0.3 : 1, pointerEvents: isLocked ? 'none' : 'auto' }}>
-            <div ref={sbRef} onMouseDown={(e: any) => { dragging.current = true; handleSBInteraction(e); }}
+          <div style={{ marginTop: 16 }}>
+            <div ref={sbRef}
+              onMouseDown={(e: any) => { dragging.current = true; handleSBInteraction(e); }}
               onMouseMove={(e: any) => { if (dragging.current) handleSBInteraction(e); }}
               onMouseUp={() => { dragging.current = false; }}
               onTouchStart={(e: any) => { dragging.current = true; handleSBInteraction(e); }}
@@ -180,15 +184,13 @@ export default function RenkHafiza({ playerName }: Props) {
               }}>
               <div style={{ position: 'absolute', width: 18, height: 18, borderRadius: '50%', border: '2.5px solid var(--beyaz)', boxShadow: '0 0 0 1.5px rgba(0,0,0,0.55)', transform: 'translate(-50%, -50%)', pointerEvents: 'none', left: `${sat}%`, top: `${100 - bri}%` }} />
             </div>
-            <input type="range" min={0} max={360} value={hue} onChange={(e) => setHue(parseInt(e?.target?.value ?? '0'))}
+            <input type="range" min={0} max={360} value={hue} onChange={(e) => setHueSafe(parseInt(e?.target?.value ?? '0'))}
               style={{ width: '100%', height: 16, borderRadius: 999, WebkitAppearance: 'none', background: 'linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)' }} />
           </div>
         )}
-
         {localStatus === 'recall' && !isLocked && (
           <button className="btn-action" onClick={submitGuess} style={{ marginTop: 16 }}>Tahminimi Gönder</button>
         )}
-
         {localStatus === 'recall' && isLocked && (
           <div style={{ marginTop: 10, color: 'var(--tozpembe)', fontFamily: "'Fraunces', serif", fontSize: '1.1rem' }}>
             Rakibinin tahmini bekleniyor...
@@ -196,7 +198,6 @@ export default function RenkHafiza({ playerName }: Props) {
             <button className="btn-ghost" onClick={() => update(ref(db, 'game'), { status: 'idle' })} style={{ marginTop: 10 }}>İptal Et</button>
           </div>
         )}
-
         {localStatus === 'result' && gameData && (
           <div style={{ marginTop: 16 }}>
             <div style={{ display: 'flex', gap: 14, margin: '16px 0' }}>
@@ -217,7 +218,7 @@ export default function RenkHafiza({ playerName }: Props) {
             </div>
             <div style={{ color: 'var(--tozpembe)', fontFamily: "'Fraunces', serif", fontSize: '1.1rem' }}>
               {gameData?.lastRoundWinner === 'Draw' ? 'Berabere!' : `Bu turu ${gameData?.lastRoundWinner} kazandı!`}
-              <br /><span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Yakınlık -&gt; Emircan: %{gameData?.scores?.Emircan ?? 0} | Efsun: %{gameData?.scores?.Efsun ?? 0}</span>
+              <br /><span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Yakınlık → Emircan: %{gameData?.scores?.Emircan ?? 0} | Efsun: %{gameData?.scores?.Efsun ?? 0}</span>
             </div>
             <button className="btn-ghost" onClick={() => set(ref(db, 'game/status'), 'idle')} style={{ marginTop: 20 }}>Sonraki Tura Geç</button>
           </div>

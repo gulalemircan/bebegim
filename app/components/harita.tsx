@@ -2,12 +2,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { sfx } from '@/lib/sounds';
-import { db } from '@/lib/firebase';
-import { ref, onValue, push, set } from 'firebase/database';
 
 export default function Harita() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
+  const leafletRef = useRef<any>(null);
   const [showPinModal, setShowPinModal] = useState(false);
   const [pendingPin, setPendingPin] = useState<{ lat: number; lng: number } | null>(null);
   const [pinName, setPinName] = useState('');
@@ -16,28 +15,26 @@ export default function Harita() {
   const markersRef = useRef<any[]>([]);
 
   useEffect(() => {
-    const pinsRef = ref(db, 'map_pins');
-    const unsub = onValue(pinsRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setPins(Object.values(data));
-      } else {
-        setPins([]);
-      }
-    });
-    return () => unsub();
+    const saved = localStorage?.getItem?.('ee_pins');
+    if (saved) {
+      try { setPins(JSON.parse(saved)); } catch { /* ignore */ }
+    }
   }, []);
 
   useEffect(() => {
-    let L: any;
+    let isMounted = true;
     const loadMap = async () => {
-      L = await import('leaflet');
-      if (!mapRef?.current || mapInstance?.current) return;
+      const L = await import('leaflet');
+      if (!isMounted || !mapRef?.current || mapInstance?.current) return;
+
+      leafletRef.current = L;
 
       const map = L.map(mapRef.current, { worldCopyJump: true }).setView([30, 20], 2);
-      L.tileLayer('https://lh3.googleusercontent.com/f7oQQ7ImS1jAT0UJSbl8WK2TRigRhmXOgtyLNY6F9bjbOEW3Vs0Ee9NZoompPx6n63kJmEq6NeNM9uxVoaOwdGn9zi5HaJbcPdc=e365-pa-nu-s0', {
-        maxZoom: 20,
-        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+
+      // OpenStreetMap - resmi ve güvenilir tile kaynağı
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       }).addTo(map);
 
       map.on('click', (e: any) => {
@@ -50,6 +47,7 @@ export default function Harita() {
     loadMap();
 
     return () => {
+      isMounted = false;
       if (mapInstance?.current) {
         mapInstance.current.remove();
         mapInstance.current = null;
@@ -58,8 +56,8 @@ export default function Harita() {
   }, []);
 
   useEffect(() => {
-    if (!mapInstance?.current) return;
-    const L = require('leaflet');
+    if (!mapInstance?.current || !leafletRef?.current) return;
+    const L = leafletRef.current;
 
     markersRef?.current?.forEach?.((m: any) => mapInstance?.current?.removeLayer?.(m));
     markersRef.current = [];
@@ -76,18 +74,9 @@ export default function Harita() {
   const addPin = () => {
     const name = pinName?.trim?.();
     if (name && pendingPin) {
-      if (typeof window !== 'undefined' && window.navigator.vibrate) {
-        window.navigator.vibrate(50);
-      }
-      const newPinRef = push(ref(db, 'map_pins'));
-      set(newPinRef, {
-        name,
-        note: pinNote?.trim?.() ?? '',
-        lat: pendingPin.lat,
-        lng: pendingPin.lng,
-        timestamp: Date.now()
-      });
-      
+      const newPins = [...(pins ?? []), { name, note: pinNote?.trim?.() ?? '', lat: pendingPin?.lat, lng: pendingPin?.lng }];
+      setPins(newPins);
+      localStorage?.setItem?.('ee_pins', JSON.stringify(newPins));
       sfx.success();
       setShowPinModal(false);
       setPinName('');

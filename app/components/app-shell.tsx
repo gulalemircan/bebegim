@@ -33,8 +33,9 @@ export default function AppShell() {
   const [animating, setAnimating] = useState(false);
 
   useEffect(() => {
-    const logged = sessionStorage?.getItem?.('isLoggedIn');
-    const name = sessionStorage?.getItem?.('playerName');
+    // localStorage kullan - sekme kapanınca çıkış yapılmasın
+    const logged = localStorage?.getItem?.('isLoggedIn');
+    const name = localStorage?.getItem?.('playerName');
     if (logged === 'true' && name) {
       setIsLoggedIn(true);
       setPlayerName(name);
@@ -46,8 +47,8 @@ export default function AppShell() {
   }, []);
 
   const handleLogin = useCallback((name: string) => {
-    sessionStorage?.setItem?.('isLoggedIn', 'true');
-    sessionStorage?.setItem?.('playerName', name);
+    localStorage?.setItem?.('isLoggedIn', 'true');
+    localStorage?.setItem?.('playerName', name);
     setPlayerName(name);
     setIsLoggedIn(true);
   }, []);
