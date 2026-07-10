@@ -22,18 +22,15 @@ export default function AppShell() {
 
   useEffect(() => {
     const storedName = localStorage.getItem('ee_player_name');
-
     if (storedName) {
       setPlayerName(storedName);
-      return;
-    }
-
-    const enteredName = window.prompt('Lütfen ismini gir (Efsun / Emircan):');
-
-    if (enteredName?.trim()) {
-      const cleanName = enteredName.trim();
-      localStorage.setItem('ee_player_name', cleanName);
-      setPlayerName(cleanName);
+    } else {
+      const enteredName = window.prompt('Lütfen ismini gir (Efsun / Emircan):');
+      if (enteredName?.trim()) {
+        const cleanName = enteredName.trim();
+        localStorage.setItem('ee_player_name', cleanName);
+        setPlayerName(cleanName);
+      }
     }
   }, []);
 
@@ -41,37 +38,26 @@ export default function AppShell() {
     switch (activeTab) {
       case 'home':
         return <HomePage setActiveTab={setActiveTab} />;
-
       case 'album':
         return <AniAlbumu playerName={playerName} />;
-
       case 'muzik':
-        return <OrtakMuzik playerName={playerName} />;
-
+        return <OrtakMuzik />;
       case 'dolap':
         return <PrensesinDolabi />;
-
       case 'yapilacaklar':
-        return <Yapilacaklar playerName={playerName} />;
-
+        return <Yapilacaklar />;
       case 'watchlist':
         return <Watchlist />;
-
       case 'wordle':
         return <OzelWordle playerName={playerName} />;
-
       case 'tabu':
         return <AskTabusu />;
-
       case 'isim-sehir':
         return <IsimSehir playerName={playerName} />;
-
       case 'hafiza':
         return <RenkHafiza />;
-
       case 'harita':
         return <Harita playerName={playerName} />;
-
       default:
         return <HomePage setActiveTab={setActiveTab} />;
     }
@@ -80,11 +66,9 @@ export default function AppShell() {
   return (
     <div className="app-container">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-
       <main className="main-content">
         {renderContent()}
       </main>
-
       <ChatWidget playerName={playerName} />
       <CrisisButton playerName={playerName} />
     </div>
