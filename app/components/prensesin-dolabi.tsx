@@ -5,154 +5,107 @@ import { db } from '@/lib/firebase';
 import { ref, onValue, push, remove } from 'firebase/database';
 import { sfx } from '@/lib/sounds';
 
-const stickerOptions = ['👗', '👕', '👖', '👠', '💍', '💄'];
-
 export default function PrensesinDolabi() {
-  const [wardrobes, setWardrobes] = useState<any>({});
+  const [closets, setClosets] = useState<any[]>([]);
   const [activeCloset, setActiveCloset] = useState<string | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
-  const [showHangerModal, setShowHangerModal] = useState(false);
-  const [hangerName, setHangerName] = useState('');
-  const [hangerLink, setHangerLink] = useState('');
-  const [selectedSticker, setSelectedSticker] = useState('👗');
+  const [items, setItems] = useState<any[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newClosetName, setNewClosetName] = useState('');
 
   useEffect(() => {
-    const unsub = onValue(ref(db, 'wardrobes'), (snap: any) => {
-      setWardrobes(snap?.val?.() ?? {});
+    const unsub = onValue(ref(db, 'wardrobes'), (snap) => {
+      const data = snap.val() || {};
+      setClosets(Object.entries(data).map(([id, val]: [string, any]) => ({ id, ...val })));
     });
-    return () => unsub?.();
+    return () => unsub();
   }, []);
 
-  const createNew = () => {
-    const name = prompt('Yeni dolabın adı ne olsun?');
-    if (name?.trim?.()) {
-      push(ref(db, 'wardrobes'), { name: name.trim() });
+  useEffect(() => {
+    if (activeCloset) {
+      const unsub = onValue(ref(db, `wardrobe_items/${activeCloset}`), (snap) => {
+        const data = snap.val() || {};
+        setItems(Object.entries(data).map(([id, val]: [string, any]) => ({ id, ...val })));
+      });
+      return () => unsub();
+    }
+  }, [activeCloset]);
+
+  const addCloset = () => {
+    if (newClosetName.trim()) {
+      push(ref(db, 'wardrobes'), { name: newClosetName.trim() });
+      setNewClosetName('');
+      setShowAddModal(false);
       sfx.success();
     }
   };
 
-  const openCloset = (id: string) => {
-    setActiveCloset(id);
-    sfx.open();
-    setTimeout(() => setIsOpen(true), 50);
-  };
-
-  const closeCloset = () => {
-    setIsOpen(false);
-    sfx.click();
-    setTimeout(() => setActiveCloset(null), 400);
-  };
-
-  const addHanger = () => {
-    if (hangerName?.trim?.() && hangerLink?.trim?.() && activeCloset) {
-      push(ref(db, `wardrobes/${activeCloset}/items`), { name: hangerName.trim(), link: hangerLink.trim(), sticker: selectedSticker });
-      setShowHangerModal(false);
-      setHangerName('');
-      setHangerLink('');
-      sfx.success();
+  const deleteCloset = (id: string) => {
+    if (confirm('Bu dolabı ve içindeki her şeyi silmek istediğine emin misin?')) {
+      remove(ref(db, `wardrobes/${id}`));
+      remove(ref(db, `wardrobe_items/${id}`));
+      setActiveCloset(null);
     }
   };
 
-  const closetData = activeCloset ? wardrobes?.[activeCloset] : null;
-  const closetItems = closetData?.items ?? {};
+  const addItem = () => {
+    const imgPrompt = prompt('Kıyafet görseli URL (veya base64):');
+    if (imgPrompt) {
+      push(ref(db, `wardrobe_items/${activeCloset}`), { img: imgPrompt, date: Date.now() });
+      sfx.success();
+    }
+  };
 
   return (
     <>
-      <div className="eyebrow">İstek Listesi</div>
-      <h1 className="section-title" style={{ color: 'var(--tozpembe)' }}>Prensesin Dolabı</h1>
-      <button className="btn-action" onClick={createNew} style={{ marginBottom: 20, background: 'var(--tozpembe)', color: 'var(--bg)', width: '100%' }}>+ Yeni Dolap Ekle</button>
+      <div className="eyebrow">Prensesin Köşesi</div>
+      <h1 className="section-title">Prensesin Dolabı</h1>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {Object.keys(wardrobes ?? {}).map((key: string) => (
-          <div key={key} onClick={() => openCloset(key)} style={{
-            display: 'flex', alignItems: 'center', background: 'var(--bg2)', border: '1px solid var(--line)',
-            borderRadius: 12, padding: 15, cursor: 'pointer', transition: '0.2s'
-          }}>
-            <span style={{ fontSize: '1.8rem', marginRight: 12 }}>🚪</span>
-            <span style={{ flex: 1, fontWeight: 700 }}>{wardrobes?.[key]?.name}</span>
-            <button onClick={(ev) => { ev?.stopPropagation?.(); if (confirm('Silmek istediğine emin misin?')) remove(ref(db, `wardrobes/${key}`)); }}
-              style={{ background: 'none', border: 'none', color: '#e08a8a', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
-          </div>
-        ))}
-      </div>
-
-      {/* Closet Modal */}
-      {activeCloset && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(10,6,5,0.75)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ width: '100%', maxWidth: 320, height: 450, perspective: 1200, margin: '0 auto', position: 'relative' }}>
-            {/* Doors */}
-            <div style={{
-              position: 'absolute', top: 0, bottom: 0, width: '50%', left: 0,
-              background: 'linear-gradient(135deg, var(--bordo), #4a131f)', border: '2px solid var(--line)',
-              transition: 'transform 0.8s cubic-bezier(0.4,0,0.2,1)', zIndex: 10,
-              display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-              transformOrigin: 'left', transform: isOpen ? 'rotateY(-105deg)' : 'rotateY(0)',
-              boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)', borderRight: '1px solid #111'
-            }}>
-              <div style={{ width: 6, height: 45, background: 'var(--tozpembe)', borderRadius: 4, marginRight: 8 }} />
+      {!activeCloset ? (
+        <div className="menu-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          {closets.map(c => (
+            <div key={c.id} style={{ position: 'relative' }}>
+              <button onClick={() => setActiveCloset(c.id)} className="card" style={{ width: '100%', padding: '30px 10px', textAlign: 'center', cursor: 'pointer' }}>
+                <div style={{ fontSize: '2rem' }}>👗</div>
+                <div style={{ fontWeight: 'bold', marginTop: 10 }}>{c.name}</div>
+              </button>
+              <button onClick={() => deleteCloset(c.id)} style={{ position: 'absolute', top: 5, right: 5, background: 'none', border: 'none', color: '#ff4d4d', fontSize: '1.2rem' }}>×</button>
             </div>
-            <div style={{
-              position: 'absolute', top: 0, bottom: 0, width: '50%', right: 0,
-              background: 'linear-gradient(135deg, var(--bordo), #4a131f)', border: '2px solid var(--line)',
-              transition: 'transform 0.8s cubic-bezier(0.4,0,0.2,1)', zIndex: 10,
-              display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
-              transformOrigin: 'right', transform: isOpen ? 'rotateY(105deg)' : 'rotateY(0)',
-              boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)', borderLeft: '1px solid #111'
-            }}>
-              <div style={{ width: 6, height: 45, background: 'var(--tozpembe)', borderRadius: 4, marginLeft: 8 }} />
-            </div>
-
-            {/* Interior */}
-            <div style={{
-              position: 'absolute', inset: 0, background: '#2a1f1c', border: '2px solid var(--line)',
-              borderRadius: 4, padding: 10, overflowY: 'auto', display: 'flex', flexDirection: 'column',
-              boxShadow: 'inset 0 10px 20px rgba(0,0,0,0.8)'
-            }}>
-              <div style={{ textAlign: 'center', color: 'var(--tozpembe)', fontFamily: "'Fraunces', serif", fontSize: '1.2rem', marginBottom: 10, borderBottom: '1px dashed var(--line)', paddingBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>{closetData?.name ?? 'Dolap'}</span>
-                <button onClick={closeCloset} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}>Kapat</button>
+          ))}
+          <button onClick={() => setShowAddModal(true)} className="card" style={{ border: '2px dashed var(--line)', padding: '30px 10px', textAlign: 'center', background: 'none' }}>
+            <div style={{ fontSize: '2rem' }}>➕</div>
+            <div style={{ fontWeight: 'bold', marginTop: 10 }}>Yeni Ekle</div>
+          </button>
+        </div>
+      ) : (
+        <div>
+          <button onClick={() => setActiveCloset(null)} className="btn-ghost" style={{ marginBottom: 20 }}>← Dolaplara Dön</button>
+          <div className="menu-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {items.map(i => (
+              <div key={i.id} className="card" style={{ padding: 5 }}>
+                <img src={i.img} alt="kıyafet" style={{ width: '100%', borderRadius: 10, aspectRatio: '3/4', objectFit: 'cover' }} />
+                <button onClick={() => remove(ref(db, `wardrobe_items/${activeCloset}/${i.id}`))} style={{ width: '100%', marginTop: 5 }} className="btn-ghost">Sil</button>
               </div>
-              <div style={{ width: '100%', height: 8, background: 'linear-gradient(to bottom, #ccc, #777)', borderRadius: 4, marginBottom: 15, boxShadow: '0 4px 6px rgba(0,0,0,0.6)' }} />
-              <div style={{ flex: 1, overflowY: 'auto', paddingRight: 5 }}>
-                {Object.keys(closetItems).map((k: string) => {
-                  const it = closetItems?.[k] ?? {};
-                  return (
-                    <div key={k} style={{ display: 'flex', alignItems: 'center', background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 8, marginBottom: 8, padding: '8px 12px' }}>
-                      <span style={{ fontSize: '1.5rem', marginRight: 10 }}>{it?.sticker ?? '🪝'}</span>
-                      <a href={it?.link} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--beyaz)', textDecoration: 'none', flex: 1, fontFamily: "'Fraunces', serif", fontSize: '0.95rem' }}>{it?.name}</a>
-                      <button onClick={() => { if (confirm('Silmek istiyor musun?')) remove(ref(db, `wardrobes/${activeCloset}/items/${k}`)); }}
-                        style={{ background: 'none', border: 'none', color: '#e08a8a', cursor: 'pointer' }}>✕</button>
-                    </div>
-                  );
-                })}
-              </div>
-              <button className="btn-ghost" onClick={() => setShowHangerModal(true)} style={{ marginTop: 10, borderColor: 'var(--tozpembe)', color: 'var(--tozpembe)' }}>+ Askı Ekle</button>
-            </div>
+            ))}
+            <button onClick={addItem} className="card" style={{ border: '2px dashed var(--line)', background: 'none', height: '100%', minHeight: 150 }}>➕ Ekle</button>
           </div>
         </div>
       )}
 
-      {/* Hanger Modal */}
-      {showHangerModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(10,6,5,0.75)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 400 }}>
-            <h3 style={{ color: 'var(--tozpembe)', marginTop: 0, fontFamily: "'Fraunces', serif" }}>Yeni Askı Ekle</h3>
-            <input type="text" value={hangerName} onChange={(e) => setHangerName(e?.target?.value ?? '')} placeholder="Ürün Adı"
-              style={{ width: '100%', marginBottom: 14, padding: 10, borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--beyaz)' }} />
-            <input type="text" value={hangerLink} onChange={(e) => setHangerLink(e?.target?.value ?? '')} placeholder="Ürün Linki"
-              style={{ width: '100%', marginBottom: 14, padding: 10, borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--beyaz)' }} />
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 15 }}>
-              {stickerOptions.map((s: string) => (
-                <span key={s} onClick={() => { setSelectedSticker(s); sfx.click(); }} style={{
-                  fontSize: '1.6rem', padding: 6, border: `2px solid ${s === selectedSticker ? 'var(--tozpembe)' : 'transparent'}`,
-                  borderRadius: 8, cursor: 'pointer', transition: '0.2s', background: s === selectedSticker ? 'rgba(217,166,162,0.2)' : 'var(--bg2)',
-                  transform: s === selectedSticker ? 'scale(1.1)' : 'scale(1)'
-                }}>{s}</span>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
-              <button className="btn-ghost" onClick={() => setShowHangerModal(false)}>Vazgeç</button>
-              <button className="btn-action" onClick={addHanger}>Askıya As</button>
+      {showAddModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div className="card" style={{ width: '100%', maxWidth: 400 }}>
+            <h3 style={{ marginTop: 0 }}>Yeni Dolap İsmi</h3>
+            <input 
+              type="text" 
+              value={newClosetName} 
+              onChange={e => setNewClosetName(e.target.value)} 
+              className="chat-input" 
+              placeholder="Örn: Yazlık Elbiseler" 
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: 10, marginTop: 15 }}>
+              <button onClick={() => setShowAddModal(false)} className="btn-ghost" style={{ flex: 1 }}>İptal</button>
+              <button onClick={addCloset} className="btn-action" style={{ flex: 1 }}>Ekle</button>
             </div>
           </div>
         </div>

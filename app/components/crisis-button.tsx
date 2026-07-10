@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { db } from '@/lib/firebase';
+import { ref, push } from 'firebase/database';
+import { sendNotification } from '@/lib/notifications';
 
 export default function CrisisButton() {
   const [showModal, setShowModal] = useState(false);
@@ -15,6 +18,18 @@ export default function CrisisButton() {
   const open = () => {
     setShowModal(true);
     alarmRef?.current?.play?.()?.catch?.(() => {});
+    // Bildirim gönder: sevgilinin yardıma ihtiyacı var
+    sendNotification({
+      type: 'emergency',
+      title: '🚨 Alarm!',
+      body: 'Sevgilin yardıma ihtiyacı var!',
+      sender: 'system',
+    });
+    // Ayrıca firebase'e alarm kaydı
+    push(ref(db, 'alarms'), {
+      active: true,
+      timestamp: Date.now(),
+    });
   };
 
   const close = () => {

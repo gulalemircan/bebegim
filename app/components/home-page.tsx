@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '@/lib/firebase';
 import { ref, onValue, set } from 'firebase/database';
+import { sendNotification } from '@/lib/notifications';
 import type { PageId } from './app-shell';
 
 interface HomePageProps {
@@ -32,10 +33,6 @@ const games: { id: PageId; icon: string; label: string; color: string }[] = [
   { id: 'tabu', icon: '🙊', label: 'Aşk Tabusu (Online)', color: 'var(--tozpembe)' },
   { id: 'wordle', icon: '🟩', label: 'Özel Wordle (Online)', color: 'var(--mavi)' },
   { id: 'isimsehir', icon: '📝', label: 'İsim Şehir (Online)', color: 'var(--kahve)' },
-  { id: 'satranc', icon: '♟️', label: 'Satranç', color: 'var(--bordo)' },
-  { id: 'dama', icon: '⚪', label: 'Dama', color: 'var(--beyaz)' },
-  { id: 'tavla', icon: '🎲', label: 'Tavla', color: 'var(--kahve)' },
-  { id: 'amiral', icon: '🚢', label: 'Amiral Battı', color: 'var(--mavi)' },
 ];
 
 function pad(n: number): string { return n?.toString?.()?.padStart?.(2, '0') ?? '00'; }
@@ -55,11 +52,8 @@ export default function HomePage({ playerName, onNavigate }: HomePageProps) {
   const [meetInfo, setMeetInfo] = useState({ monthNum: 0, daysLeft: '' });
   const [relInfo, setRelInfo] = useState({ monthNum: 0, daysLeft: '' });
 
-  // TARİH DÜZELTMELERİ (OSMANİYE/KADİRLİ AYARI)
-  // JS'de aylar 0-11 arasıdır. 
-  // 13 Aralık 2025 için (2025, 11, 13) kullanılır.
   const startDate = new Date(2025, 11, 13, 0, 0, 0); 
-  const meetDate = new Date(2025, 10, 7, 0, 0, 0); // 7 Kasım 2025
+  const meetDate = new Date(2025, 10, 7, 0, 0, 0);
 
   const vibrate = (ms = 30) => {
     if (typeof window !== 'undefined' && window.navigator.vibrate) {
@@ -107,8 +101,15 @@ export default function HomePage({ playerName, onNavigate }: HomePageProps) {
   const handleSetMood = useCallback((moodText: string) => {
     vibrate(40);
     set(ref(db, 'mood/current'), moodText);
+    // Bildirim gönder: ruh hali değişti
+    sendNotification({
+      type: 'mood',
+      title: 'Ruh Hali Değişti',
+      body: `${playerName}: ${moodText}`,
+      sender: playerName,
+    });
     setShowMoodModal(false);
-  }, []);
+  }, [playerName]);
 
   const handleNavigate = (id: PageId) => {
     vibrate(30);
@@ -120,12 +121,10 @@ export default function HomePage({ playerName, onNavigate }: HomePageProps) {
       <div className="eyebrow">Emircan & Efsun</div>
 
       <div className="card" style={{ marginTop: 10, borderColor: 'var(--tozpembe)', textAlign: 'center', padding: 15 }}>
-        <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Efsun&apos;un Şu Anki Ruh Hali</div>
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Şu Anki Ruh Hali</div>
         <div style={{ fontSize: '1.4rem', margin: '10px 0', fontFamily: "'Fraunces', serif", color: 'var(--beyaz)' }}>{mood}</div>
-        {playerName === 'Efsun' && (
-          <button className="btn-ghost" style={{ margin: '0 auto', fontSize: '0.75rem', padding: '6px 16px' }}
-            onClick={() => { vibrate(30); setShowMoodModal(true); }}>Ruh Halini Değiştir</button>
-        )}
+        <button className="btn-ghost" style={{ margin: '0 auto', fontSize: '0.75rem', padding: '6px 16px' }}
+          onClick={() => { vibrate(30); setShowMoodModal(true); }}>Ruh Halini Değiştir</button>
       </div>
 
       <h1 className="section-title">Birlikte geçen zaman</h1>
