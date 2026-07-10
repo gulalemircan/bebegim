@@ -13,7 +13,8 @@ export default function CrisisButton({ playerName }: Props) {
 
   const handleCrisis = async () => {
     setActive(true);
-    sfx.error();
+    // error() mevcut olmadığı için click() veya success() kullanıyoruz
+    sfx.click();
 
     await sendNotification({
       type: 'emergency',
