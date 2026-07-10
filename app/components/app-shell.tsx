@@ -36,7 +36,7 @@ export default function AppShell() {
     switch (activeTab) {
       case 'home': return <HomePage setActiveTab={setActiveTab} />;
       case 'album': return <AniAlbumu playerName={playerName} />;
-      case 'muzik': return <OrtakMuzik />;
+      case 'muzik': return <OrtakMuzik playerName={playerName} />;
       case 'dolap': return <PrensesinDolabi />;
       case 'yapilacaklar': return <Yapilacaklar />;
       case 'watchlist': return <Watchlist />;
