@@ -2,55 +2,50 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { ref, onValue, push, update } from 'firebase/database';
+import { ref, onValue, push, remove, update } from 'firebase/database';
 import { sfx } from '@/lib/sounds';
 
-interface Props { playerName: string; }
-
-export default function Yapilacaklar({ playerName }: Props) {
-  const [items, setItems] = useState<any[]>([]);
+export default function Yapilacaklar() {
+  const [tasks, setTasks] = useState<any[]>([]);
   const [input, setInput] = useState('');
 
   useEffect(() => {
-    const unsub = onValue(ref(db, 'bucketlist'), (snap: any) => {
-      const data = snap?.val?.() ?? {};
-      const arr = Object.keys(data).map((k: string) => ({ id: k, ...(data[k] ?? {}) })).sort((a: any, b: any) => (b?.time ?? 0) - (a?.time ?? 0));
-      setItems(arr);
+    const unsub = onValue(ref(db, 'todos'), (snap) => {
+      const data = snap.val() || {};
+      setTasks(Object.entries(data).map(([id, val]: [string, any]) => ({ id, ...val })));
     });
-    return () => unsub?.();
+    return () => unsub();
   }, []);
 
-  const add = () => {
-    const val = input?.trim?.();
-    if (val) {
-      push(ref(db, 'bucketlist'), { text: val, done: false, by: playerName, time: Date.now() });
+  const addTask = () => {
+    if (input.trim()) {
+      push(ref(db, 'todos'), { text: input.trim(), done: false, time: Date.now() });
       setInput('');
       sfx.success();
     }
   };
 
-  const toggle = (id: string, current: boolean) => {
-    update(ref(db, `bucketlist/${id}`), { done: !current });
+  const toggleTask = (id: string, currentStatus: boolean) => {
+    update(ref(db, `todos/${id}`), { done: !currentStatus });
     sfx.click();
   };
 
   return (
     <>
-      <div className="eyebrow">Hayaller & Hedefler</div>
-      <h1 className="section-title">Yapılacaklar</h1>
-      <div className="card" style={{ padding: 15 }}>
-        <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-          <input type="text" value={input} onChange={(e) => setInput(e?.target?.value ?? '')} placeholder="Örn: Birlikte kampa git..." onKeyPress={(e) => { if (e?.key === 'Enter') add(); }}
-            style={{ flex: 1, padding: 12, borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--beyaz)' }} />
-          <button className="btn-action" onClick={add}>Ekle</button>
-        </div>
-        {(items ?? []).map((item: any) => (
-          <div key={item?.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 12, padding: 15, marginBottom: 10, opacity: item?.done ? 0.6 : 1 }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '1.05rem', textDecoration: item?.done ? 'line-through' : 'none' }}>{item?.text}</div>
-              <div style={{ color: 'var(--text-dim)', fontSize: '0.8rem', marginTop: 4 }}>Ekleyen: {item?.by}</div>
-            </div>
-            <input type="checkbox" checked={item?.done ?? false} onChange={() => toggle(item?.id, item?.done ?? false)} style={{ width: 20, height: 20, cursor: 'pointer' }} />
+      <div className="eyebrow">Planlar & Hayaller</div>
+      <h1 className="section-title">Yapılacaklar Listesi</h1>
+
+      <div className="card" style={{ display: 'flex', gap: 10, marginBottom: 25 }}>
+        <input type="text" value={input} onChange={e => setInput(e.target.value)} placeholder="Yeni bir görev ekle..." className="chat-input" onKeyDown={e => e.key === 'Enter' && addTask()} />
+        <button onClick={addTask} className="btn-action" style={{ whiteSpace: 'nowrap' }}>Ekle</button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {tasks.sort((a,b) => b.time - a.time).map(task => (
+          <div key={task.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 15, opacity: task.done ? 0.6 : 1 }}>
+            <input type="checkbox" checked={task.done} onChange={() => toggleTask(task.id, task.done)} style={{ width: 22, height: 22, accentColor: 'var(--tozpembe)' }} />
+            <span style={{ flex: 1, textDecoration: task.done ? 'line-through' : 'none', fontSize: '1.1rem' }}>{task.text}</span>
+            <button onClick={() => remove(ref(db, `todos/${task.id}`))} style={{ background: 'none', border: 'none', color: '#ff4d4d' }}>✕</button>
           </div>
         ))}
       </div>
