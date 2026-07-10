@@ -5,53 +5,61 @@ import { db } from '@/lib/firebase';
 import { ref, onValue, push, remove } from 'firebase/database';
 import { sfx } from '@/lib/sounds';
 
-interface Props { playerName: string; }
+interface Props {
+  playerName: string;
+}
 
 export default function OrtakMuzik({ playerName }: Props) {
-  const [items, setItems] = useState<any[]>([]);
-  const [link, setLink] = useState('');
+  const [songs, setSongs] = useState<any[]>([]);
+  const [url, setUrl] = useState('');
+  const [title, setTitle] = useState('');
 
   useEffect(() => {
-    const unsub = onValue(ref(db, 'music'), (snap: any) => {
-      const data = snap?.val?.() ?? {};
-      const arr = Object.keys(data).map((k: string) => ({ id: k, ...(data[k] ?? {}) })).sort((a: any, b: any) => (b?.time ?? 0) - (a?.time ?? 0));
-      setItems(arr);
+    const unsub = onValue(ref(db, 'playlist'), (snap) => {
+      const data = snap.val() || {};
+      setSongs(Object.entries(data).map(([id, val]: [string, any]) => ({ id, ...val })));
     });
-    return () => unsub?.();
+    return () => unsub();
   }, []);
 
-  const add = () => {
-    if (link?.includes?.('spotify.com')) {
-      try {
-        const url = new URL(link);
-        const embedUrl = `https://open.spotify.com/embed${url?.pathname}`;
-        push(ref(db, 'music'), { url: embedUrl, time: Date.now(), by: playerName });
-        setLink('');
-        sfx.success();
-      } catch { alert('Geçersiz link.'); }
-    } else {
-      alert('Geçerli bir Spotify linki girin.');
+  const addSong = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (url.trim() && title.trim()) {
+      push(ref(db, 'playlist'), {
+        title: title.trim(),
+        url: url.trim(),
+        addedBy: playerName || 'Anonim',
+        date: Date.now()
+      });
+      setUrl('');
+      setTitle('');
+      sfx.success();
     }
   };
 
   return (
     <>
-      <div className="eyebrow">Senkronize Dinle</div>
-      <h1 className="section-title">Ortak Müzik</h1>
-      <div className="card" style={{ padding: 15 }}>
-        <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
-          <input type="text" value={link} onChange={(e) => setLink(e?.target?.value ?? '')} placeholder="Spotify şarkı/liste linki yapıştır..."
-            style={{ flex: 1, padding: 12, borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--beyaz)' }} />
-          <button className="btn-action" onClick={add}>Ekle</button>
-        </div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Örn: https://open.spotify.com/track/...</p>
+      <div className="eyebrow">Bizim Ritmi̇miz</div>
+      <h1 className="section-title">Ortak Müzik Listesi</h1>
+
+      <form className="card" onSubmit={addSong} style={{ marginBottom: 30 }}>
+        <input type="text" placeholder="Şarkı Adı" value={title} onChange={e => setTitle(e.target.value)} className="chat-input" style={{ marginBottom: 10 }} required />
+        <input type="text" placeholder="YouTube / Spotify Linki" value={url} onChange={e => setUrl(e.target.value)} className="chat-input" style={{ marginBottom: 10 }} required />
+        <button type="submit" className="btn-action" style={{ width: '100%' }}>➕ Listeye Ekle</button>
+      </form>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {[...songs].reverse().map(song => (
+          <div key={song.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{song.title}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Ekleyen: {song.addedBy}</div>
+              <a href={song.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.8rem', color: 'var(--tozpembe)', textDecoration: 'none' }}>Dinlemek için tıkla →</a>
+            </div>
+            <button onClick={() => remove(ref(db, `playlist/${song.id}`))} style={{ background: 'none', border: 'none', color: '#ff4d4d', padding: 10, cursor: 'pointer' }}>✕</button>
+          </div>
+        ))}
       </div>
-      {(items ?? []).map((item: any) => (
-        <div key={item?.id} style={{ position: 'relative', marginBottom: 10 }}>
-          <iframe src={item?.url} height={152} style={{ width: '100%', borderRadius: 12, border: 'none' }} allow="encrypted-media" />
-          <button onClick={() => remove(ref(db, `music/${item?.id}`))} style={{ position: 'absolute', top: 15, right: 15, background: 'var(--bg)', border: 'none', color: '#e08a8a', borderRadius: '50%', padding: '5px 8px', cursor: 'pointer' }}>✕</button>
-        </div>
-      ))}
     </>
   );
 }

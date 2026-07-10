@@ -41,7 +41,7 @@ export default function AppShell() {
       case 'album':
         return <AniAlbumu playerName={playerName} />;
       case 'muzik':
-        return <OrtakMuzik />;
+        return <OrtakMuzik playerName={playerName} />;
       case 'dolap':
         return <PrensesinDolabi />;
       case 'yapilacaklar':
