@@ -1,111 +1,118 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import { db } from '@/lib/firebase';
+import { ref, onValue, push, remove } from 'firebase/database';
 import { sfx } from '@/lib/sounds';
+import { sendNotification } from '@/lib/notifications';
 
-export default function Harita() {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstance = useRef<any>(null);
-  const leafletRef = useRef<any>(null);
-  const [showPinModal, setShowPinModal] = useState(false);
-  const [pendingPin, setPendingPin] = useState<{ lat: number; lng: number } | null>(null);
-  const [pinName, setPinName] = useState('');
-  const [pinNote, setPinNote] = useState('');
+interface Props {
+  playerName: string;
+}
+
+export default function Harita({ playerName }: Props) {
   const [pins, setPins] = useState<any[]>([]);
-  const markersRef = useRef<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage?.getItem?.('ee_pins');
-    if (saved) {
-      try { setPins(JSON.parse(saved)); } catch { /* ignore */ }
-    }
-  }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-    const loadMap = async () => {
-      const L = await import('leaflet');
-      if (!isMounted || !mapRef?.current || mapInstance?.current) return;
-
-      leafletRef.current = L;
-
-      const map = L.map(mapRef.current, { worldCopyJump: true }).setView([30, 20], 2);
-
-      // OpenStreetMap - resmi ve güvenilir tile kaynağı
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      }).addTo(map);
-
-      map.on('click', (e: any) => {
-        setPendingPin({ lat: e?.latlng?.lat, lng: e?.latlng?.lng });
-        setShowPinModal(true);
-      });
-
-      mapInstance.current = map;
-    };
-    loadMap();
-
-    return () => {
-      isMounted = false;
-      if (mapInstance?.current) {
-        mapInstance.current.remove();
-        mapInstance.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!mapInstance?.current || !leafletRef?.current) return;
-    const L = leafletRef.current;
-
-    markersRef?.current?.forEach?.((m: any) => mapInstance?.current?.removeLayer?.(m));
-    markersRef.current = [];
-
-    (pins ?? []).forEach((p: any) => {
-      const icon = L.divIcon({ className: 'custom-pin-icon', html: '📍', iconSize: [26, 26], iconAnchor: [13, 26] });
-      const marker = L.marker([p?.lat, p?.lng], { icon }).addTo(mapInstance.current);
-      marker.bindPopup(`<b>${p?.name ?? ''}</b><br>${p?.note ?? ''}`);
-      marker.on('click', () => sfx.click());
-      markersRef.current.push(marker);
+    const unsub = onValue(ref(db, 'pins'), (snap) => {
+      const data = snap.val() || {};
+      setPins(Object.entries(data).map(([id, val]: [string, any]) => ({ id, ...val })));
     });
-  }, [pins]);
+    return () => unsub();
+  }, []);
 
-  const addPin = () => {
-    const name = pinName?.trim?.();
-    if (name && pendingPin) {
-      const newPins = [...(pins ?? []), { name, note: pinNote?.trim?.() ?? '', lat: pendingPin?.lat, lng: pendingPin?.lng }];
-      setPins(newPins);
-      localStorage?.setItem?.('ee_pins', JSON.stringify(newPins));
-      sfx.success();
-      setShowPinModal(false);
-      setPinName('');
-      setPinNote('');
+  const addPin = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (loading) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    const title = prompt("Bu noktada ne oldu? ✨");
+    if (title) {
+      setLoading(true);
+      push(ref(db, 'pins'), {
+        title,
+        x,
+        y,
+        addedBy: playerName || 'Anonim',
+        time: Date.now()
+      }).then(() => {
+        sendNotification({
+          type: 'location',
+          title: '📍 Yeni Konum!',
+          body: `${playerName} haritaya yeni bir anı ekledi: "${title}"`,
+          sender: playerName
+        });
+        sfx.success();
+      }).finally(() => setLoading(false));
     }
   };
 
   return (
-    <>
-      <div className="eyebrow">Hayaller listesi</div>
-      <h1 className="section-title">Gelecek planları haritası</h1>
-      <div className="card">
-        <div ref={mapRef} style={{ position: 'relative', marginTop: 16, borderRadius: 16, overflow: 'hidden', border: '1px solid var(--line)', height: 400, zIndex: 1, background: 'var(--bg2)' }} />
-      </div>
+    <div style={{ padding: '0 10px' }}>
+      <div className="eyebrow">Anılarımızın Haritası</div>
+      <h1 className="section-title">Aşk Haritası</h1>
+      <p style={{ marginBottom: 20, color: 'var(--text-dim)', fontSize: '0.9rem' }}>Haritada bir yere tıkla ve oradaki anımızı ekle.</p>
 
-      {showPinModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(10,6,5,0.75)', zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ background: 'var(--bg2)', border: '1px solid var(--line)', borderRadius: 16, padding: 22, width: '100%', maxWidth: 400, textAlign: 'left' }}>
-            <input type="text" value={pinName} onChange={(e) => setPinName(e?.target?.value ?? '')} placeholder="Yer adı"
-              style={{ width: '100%', marginBottom: 14, padding: 10, borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--beyaz)' }} />
-            <textarea value={pinNote} onChange={(e) => setPinNote(e?.target?.value ?? '')} rows={2} placeholder="Not (opsiyonel)"
-              style={{ width: '100%', marginBottom: 14, padding: 10, borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg)', color: 'var(--beyaz)' }} />
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn-ghost" onClick={() => setShowPinModal(false)}>Vazgeç</button>
-              <button className="btn-action" onClick={addPin}>Ekle</button>
+      <div 
+        onClick={addPin}
+        style={{ 
+          width: '100%', 
+          aspectRatio: '16/9', 
+          background: 'var(--bg2)', 
+          borderRadius: 20, 
+          position: 'relative', 
+          overflow: 'hidden', 
+          border: '2px solid var(--line)',
+          cursor: 'crosshair'
+        }}
+      >
+        {/* Örnek Harita Arkaplanı - Gerçek harita yerine stilize bir görsel/izgara */}
+        <div style={{ 
+          position: 'absolute', inset: 0, opacity: 0.1, 
+          backgroundImage: 'radial-gradient(circle, var(--tozpembe) 1px, transparent 1px)', 
+          backgroundSize: '20px 20px' 
+        }} />
+
+        {pins.map(pin => (
+          <div 
+            key={pin.id}
+            title={pin.title}
+            style={{ 
+              position: 'absolute', 
+              left: `${pin.x}%`, 
+              top: `${pin.y}%`, 
+              transform: 'translate(-50%, -100%)',
+              fontSize: '1.5rem',
+              cursor: 'pointer',
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))'
+            }}
+          >
+            📍
+            <div style={{ 
+              position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+              background: 'var(--bg2)', color: 'var(--beyaz)', padding: '4px 8px', borderRadius: 4,
+              fontSize: '0.7rem', whiteSpace: 'nowrap', border: '1px solid var(--line)'
+            }}>
+              {pin.title}
             </div>
           </div>
-        </div>
-      )}
-    </>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 30 }}>
+        {pins.slice(-3).reverse().map(pin => (
+          <div key={pin.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div>
+              <div style={{ fontWeight: 'bold' }}>{pin.title}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Ekleyen: {pin.addedBy}</div>
+            </div>
+            <button onClick={(e) => { e.stopPropagation(); remove(ref(db, `pins/${pin.id}`)); }} style={{ background: 'none', border: 'none', color: '#ff4d4d' }}>Sil</button>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
