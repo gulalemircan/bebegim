@@ -1,0 +1,16 @@
+{
+  "name": "E & E",
+  "short_name": "E&E",
+  "description": "Emircan & Efsun - Sadece İkinize Özel",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#180f0d",
+  "theme_color": "#7d2438",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
