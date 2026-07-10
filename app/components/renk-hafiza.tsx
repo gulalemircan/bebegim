@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { sfx } from '@/lib/sounds';
 
 const COLORS = ['#FF4B2B', '#3498db', '#2ecc71', '#f1c40f'];
@@ -23,23 +23,23 @@ export default function RenkHafiza() {
   const playSequence = async (seq: number[]) => {
     setMessage('İzle...');
     for (let i = 0; i < seq.length; i++) {
-        await new Promise(r => setTimeout(r, 600));
-        setActiveColor(seq[i]);
-        sfx.click();
-        await new Promise(r => setTimeout(r, 300));
-        setActiveColor(null);
+      await new Promise(r => setTimeout(r, 600));
+      setActiveColor(seq[i]);
+      sfx.click();
+      await new Promise(r => setTimeout(r, 300));
+      setActiveColor(null);
     }
     setMessage('Senin sıran!');
   };
 
   const handleColorClick = (idx: number) => {
     if (!isPlaying || message === 'İzle...') return;
-    
+
     const newUserSeq = [...userSequence, idx];
     setUserSequence(newUserSeq);
-    
+
     if (idx !== sequence[newUserSeq.length - 1]) {
-      sfx.error();
+      sfx.click(); // sfx.error() yok, click() kullanıyoruz
       setMessage('Eyvah! Yanlış renk. Skor: ' + (sequence.length - 1));
       setIsPlaying(false);
       return;
@@ -58,7 +58,7 @@ export default function RenkHafiza() {
     <div style={{ textAlign: 'center', padding: '0 10px' }}>
       <div className="eyebrow">Hafıza Testi</div>
       <h1 className="section-title">Renk Hafıza</h1>
-      
+
       <p style={{ marginBottom: 30, color: 'var(--tozpembe)', fontWeight: 'bold' }}>{message}</p>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15, maxWidth: 300, margin: '0 auto' }}>
