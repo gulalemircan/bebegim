@@ -40,7 +40,7 @@ export default function Harita({ playerName }: Props) {
         time: Date.now()
       }).then(() => {
         sendNotification({
-          type: 'location',
+          type: 'pin', // 'location' yerine 'pin' yaptık build hatasını çözmek için
           title: '📍 Yeni Konum!',
           body: `${playerName} haritaya yeni bir anı ekledi: "${title}"`,
           sender: playerName
@@ -69,7 +69,6 @@ export default function Harita({ playerName }: Props) {
           cursor: 'crosshair'
         }}
       >
-        {/* Örnek Harita Arkaplanı - Gerçek harita yerine stilize bir görsel/izgara */}
         <div style={{ 
           position: 'absolute', inset: 0, opacity: 0.1, 
           backgroundImage: 'radial-gradient(circle, var(--tozpembe) 1px, transparent 1px)', 
