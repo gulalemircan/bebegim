@@ -55,8 +55,11 @@ export default function HomePage({ playerName, onNavigate }: HomePageProps) {
   const [meetInfo, setMeetInfo] = useState({ monthNum: 0, daysLeft: '' });
   const [relInfo, setRelInfo] = useState({ monthNum: 0, daysLeft: '' });
 
-  const startDate = new Date(2026, 0, 13, 0, 0, 0);
-  const meetDate = new Date(2025, 11, 7, 0, 0, 0);
+  // TARİH DÜZELTMELERİ (OSMANİYE/KADİRLİ AYARI)
+  // JS'de aylar 0-11 arasıdır. 
+  // 13 Aralık 2025 için (2025, 11, 13) kullanılır.
+  const startDate = new Date(2025, 11, 13, 0, 0, 0); 
+  const meetDate = new Date(2025, 10, 7, 0, 0, 0); // 7 Kasım 2025
 
   const vibrate = (ms = 30) => {
     if (typeof window !== 'undefined' && window.navigator.vibrate) {
@@ -76,6 +79,7 @@ export default function HomePage({ playerName, onNavigate }: HomePageProps) {
     const updateCounter = () => {
       const now = new Date();
       let diff = Math.max(0, now.getTime() - startDate.getTime());
+      
       setCounter({
         days: Math.floor(diff / 86400000),
         hours: pad(Math.floor((diff % 86400000) / 3600000)),
@@ -98,7 +102,7 @@ export default function HomePage({ playerName, onNavigate }: HomePageProps) {
     updateCounter();
     const interval = setInterval(updateCounter, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [startDate, meetDate]);
 
   const handleSetMood = useCallback((moodText: string) => {
     vibrate(40);
@@ -140,7 +144,7 @@ export default function HomePage({ playerName, onNavigate }: HomePageProps) {
           ))}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px dashed var(--line)', fontSize: '0.9rem', color: 'var(--text-dim)' }}>
-          <span>Tanıştığımız gün</span><b style={{ color: 'var(--beyaz)' }}>07 Aralık 2025</b>
+          <span>Tanıştığımız gün</span><b style={{ color: 'var(--beyaz)' }}>07 Kasım 2025</b>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px dashed var(--line)', fontSize: '0.9rem', color: 'var(--text-dim)' }}>
           <span>Tanışmamızın {meetInfo.monthNum}. ayına</span><b style={{ color: 'var(--beyaz)' }}>{meetInfo.daysLeft}</b>
